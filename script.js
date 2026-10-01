@@ -86,7 +86,6 @@ const republishDuracion   = document.getElementById('republishDuracion');
 const republishIndefinido = document.getElementById('republishIndefinido');
 const republishConfirmBtn = document.getElementById('republishConfirmBtn');
 
-// 🆕 Modal detalle diario
 const detailModal      = document.getElementById('detailModal');
 const detailImg        = document.getElementById('detailImg');
 const detailTitle      = document.getElementById('detailTitle');
@@ -246,12 +245,18 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 // ================================================================
-// CONTROLES DE DURACIÓN
+// 🆕 CONTROLES DE DURACIÓN — versión actualizada
+// Si marcas "Indefinido" el campo se convierte en "∞ Indefinido"
 // ================================================================
 function setupDurationControls(inputId, checkboxId) {
   const input    = document.getElementById(inputId);
   const checkbox = document.getElementById(checkboxId);
   const btns     = document.querySelectorAll(`.btn-num-dur[data-input="${inputId}"]`);
+
+  // Guardar tipo original del input (number)
+  if (!input.dataset.originalType) {
+    input.dataset.originalType = input.type || 'number';
+  }
 
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -267,15 +272,37 @@ function setupDurationControls(inputId, checkboxId) {
 
   checkbox.addEventListener('change', (e) => {
     if (e.target.checked) {
-      input.dataset.savedValue = input.value;
+      // 1️⃣ Guardar el valor numérico actual
+      input.dataset.savedValue = input.value || 30;
+
+      // 2️⃣ Convertir a texto y mostrar "∞ Indefinido"
+      input.type = 'text';
+      input.value = '∞ Indefinido';
       input.disabled = true;
-      input.value = 0;
+      input.readOnly = true;
+      input.style.textAlign = 'center';
+      input.style.fontWeight = '800';
+      input.style.color = '#c4b5fd';
+      input.style.letterSpacing = '.5px';
+
+      // 3️⃣ Deshabilitar botones +/−
       btns.forEach(b => b.disabled = true);
     } else {
+      // 1️⃣ Volver a tipo número
+      input.type = input.dataset.originalType || 'number';
+
+      // 2️⃣ Restaurar valor previo (o 30 por defecto)
+      const saved = parseInt(input.dataset.savedValue, 10);
+      input.value = (!isNaN(saved) && saved >= 1) ? saved : 30;
+
+      // 3️⃣ Reactivar input y quitar estilos especiales
       input.disabled = false;
+      input.readOnly = false;
+      input.style.color = '';
+      input.style.letterSpacing = '';
+
+      // 4️⃣ Reactivar botones
       btns.forEach(b => b.disabled = false);
-      input.value = input.dataset.savedValue || 30;
-      if (parseInt(input.value, 10) < 1) input.value = 30;
     }
   });
 }
@@ -355,9 +382,16 @@ formAnuncio.addEventListener('submit', async (e) => {
 
     toast('✅ Anuncio guardado', 'ok');
     formAnuncio.reset();
+
+    // Reset controles
     document.getElementById('anuncioRepeticiones').value = 3;
-    document.getElementById('anuncioDuracion').value = 30;
-    document.getElementById('anuncioDuracion').disabled = false;
+    const durInput = document.getElementById('anuncioDuracion');
+    durInput.type = 'number';
+    durInput.value = 30;
+    durInput.disabled = false;
+    durInput.readOnly = false;
+    durInput.style.color = '';
+    durInput.style.letterSpacing = '';
     document.getElementById('anuncioIndefinido').checked = false;
     document.querySelectorAll('.btn-num-dur[data-input="anuncioDuracion"]').forEach(b => b.disabled = false);
   } catch (err) {
@@ -666,12 +700,18 @@ function abrirRepublishModal(anuncio) {
   republicandoId = anuncio.id;
   republishTitle.textContent = anuncio.titulo || 'Sin título';
 
-  republishIndefinido.checked = false;
-  republishDuracion.disabled = false;
-  republishDuracion.value = anuncio.duracionDias || 30;
-  if (!republishDuracion.value || parseInt(republishDuracion.value, 10) < 1) {
-    republishDuracion.value = 30;
+  // Reset controls
+  const durInput = republishDuracion;
+  durInput.type = 'number';
+  durInput.value = anuncio.duracionDias || 30;
+  if (!durInput.value || parseInt(durInput.value, 10) < 1) {
+    durInput.value = 30;
   }
+  durInput.disabled = false;
+  durInput.readOnly = false;
+  durInput.style.color = '';
+  durInput.style.letterSpacing = '';
+  republishIndefinido.checked = false;
   document.querySelectorAll('.btn-num-dur[data-input="republishDuracion"]').forEach(b => b.disabled = false);
 
   republishModal.classList.remove('hidden');
@@ -768,7 +808,7 @@ function abrirPreviewDeAnuncio(anuncio) {
 }
 
 // ================================================================
-// 📊 MODAL DETALLE DIARIO — lee de anuncios_vistas
+// 📊 MODAL DETALLE DIARIO
 // ================================================================
 function abrirDetailModal(anuncio) {
   if (unsubscribeDetail) { unsubscribeDetail(); unsubscribeDetail = null; }
