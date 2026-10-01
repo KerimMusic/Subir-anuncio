@@ -245,18 +245,17 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 // ================================================================
-// 🆕 CONTROLES DE DURACIÓN — versión actualizada
-// Si marcas "Indefinido" el campo se convierte en "∞ Indefinido"
+// 🆕 CONTROLES DE DURACIÓN (ahora también afecta repeticiones)
 // ================================================================
 function setupDurationControls(inputId, checkboxId) {
   const input    = document.getElementById(inputId);
   const checkbox = document.getElementById(checkboxId);
   const btns     = document.querySelectorAll(`.btn-num-dur[data-input="${inputId}"]`);
 
-  // Guardar tipo original del input (number)
-  if (!input.dataset.originalType) {
-    input.dataset.originalType = input.type || 'number';
-  }
+  // 🆕 Referencias al campo de repeticiones (solo para el form principal)
+  const isMainForm = inputId === 'anuncioDuracion';
+  const repInput   = isMainForm ? document.getElementById('anuncioRepeticiones') : null;
+  const repBtns    = isMainForm ? document.querySelectorAll('.btn-num') : [];
 
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -272,37 +271,33 @@ function setupDurationControls(inputId, checkboxId) {
 
   checkbox.addEventListener('change', (e) => {
     if (e.target.checked) {
-      // 1️⃣ Guardar el valor numérico actual
-      input.dataset.savedValue = input.value || 30;
-
-      // 2️⃣ Convertir a texto y mostrar "∞ Indefinido"
-      input.type = 'text';
-      input.value = '∞ Indefinido';
+      // Guardar valores y deshabilitar duración
+      input.dataset.savedValue = input.value;
       input.disabled = true;
-      input.readOnly = true;
-      input.style.textAlign = 'center';
-      input.style.fontWeight = '800';
-      input.style.color = '#c4b5fd';
-      input.style.letterSpacing = '.5px';
-
-      // 3️⃣ Deshabilitar botones +/−
+      input.value = 0;
       btns.forEach(b => b.disabled = true);
+
+      // 🆕 También deshabilitar repeticiones
+      if (repInput) {
+        repInput.dataset.savedValue = repInput.value;
+        repInput.disabled = true;
+        repInput.value = 0;
+        repBtns.forEach(b => b.disabled = true);
+      }
     } else {
-      // 1️⃣ Volver a tipo número
-      input.type = input.dataset.originalType || 'number';
-
-      // 2️⃣ Restaurar valor previo (o 30 por defecto)
-      const saved = parseInt(input.dataset.savedValue, 10);
-      input.value = (!isNaN(saved) && saved >= 1) ? saved : 30;
-
-      // 3️⃣ Reactivar input y quitar estilos especiales
+      // Reactivar duración
       input.disabled = false;
-      input.readOnly = false;
-      input.style.color = '';
-      input.style.letterSpacing = '';
-
-      // 4️⃣ Reactivar botones
       btns.forEach(b => b.disabled = false);
+      input.value = input.dataset.savedValue || 30;
+      if (parseInt(input.value, 10) < 1) input.value = 30;
+
+      // 🆕 Reactivar repeticiones
+      if (repInput) {
+        repInput.disabled = false;
+        repBtns.forEach(b => b.disabled = false);
+        repInput.value = repInput.dataset.savedValue || 3;
+        if (parseInt(repInput.value, 10) < 1) repInput.value = 3;
+      }
     }
   });
 }
@@ -314,6 +309,7 @@ setupDurationControls('republishDuracion', 'republishIndefinido');
 document.querySelectorAll('.btn-num').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById('anuncioRepeticiones');
+    if (input.disabled) return;
     const step  = parseInt(btn.dataset.step, 10);
     let val = parseInt(input.value, 10) || 1;
     val += step;
@@ -328,13 +324,18 @@ formAnuncio.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!usuarioActual) { toast('Debes iniciar sesión', 'error'); return; }
 
-  const titulo       = document.getElementById('anuncioTitulo').value.trim();
-  const audioRaw     = document.getElementById('anuncioAudio').value.trim();
-  const imagenRaw    = document.getElementById('anuncioImagen').value.trim();
-  const videoRaw     = document.getElementById('anuncioVideo').value.trim();
-  const repeticiones = parseInt(document.getElementById('anuncioRepeticiones').value, 10) || 0;
+  const titulo    = document.getElementById('anuncioTitulo').value.trim();
+  const audioRaw  = document.getElementById('anuncioAudio').value.trim();
+  const imagenRaw = document.getElementById('anuncioImagen').value.trim();
+  const videoRaw  = document.getElementById('anuncioVideo').value.trim();
 
   const esIndefinido = document.getElementById('anuncioIndefinido').checked;
+
+  // 🆕 Si es indefinido → sin límite de días ni repeticiones
+  const repeticiones = esIndefinido
+    ? 0
+    : (parseInt(document.getElementById('anuncioRepeticiones').value, 10) || 0);
+
   const duracionDias = esIndefinido
     ? 0
     : (parseInt(document.getElementById('anuncioDuracion').value, 10) || 0);
@@ -344,7 +345,10 @@ formAnuncio.addEventListener('submit', async (e) => {
     toast('Coloca al menos URL de audio o de video', 'error');
     return;
   }
-  if (repeticiones < 1) { toast('Repeticiones ≥ 1', 'error'); return; }
+  if (!esIndefinido && repeticiones < 1) {
+    toast('Repeticiones ≥ 1 o marca "Indefinido"', 'error');
+    return;
+  }
   if (!esIndefinido && duracionDias < 1) {
     toast('La duración debe ser ≥ 1 día o marca "Indefinido"', 'error');
     return;
@@ -367,11 +371,15 @@ formAnuncio.addEventListener('submit', async (e) => {
   try {
     await addDoc(collection(db, COLECCION_ANUNCIOS), {
       titulo, audioUrl, imagenUrl, videoUrl, tipo,
+
+      // 🆕 Repeticiones y duración
       repeticionesPorDia: repeticiones,
+      repeticionesIlimitadas: esIndefinido,
       esIndefinido,
       duracionDias,
       fechaPublicacionMs: ahoraMs,
       fechaVencimientoMs: fechaVencimientoMs,
+
       totalVistas: 0,
       totalCompletadas: 0,
       totalSkips: 0,
@@ -383,15 +391,13 @@ formAnuncio.addEventListener('submit', async (e) => {
     toast('✅ Anuncio guardado', 'ok');
     formAnuncio.reset();
 
-    // Reset controles
+    // Resetear TODOS los controles
     document.getElementById('anuncioRepeticiones').value = 3;
-    const durInput = document.getElementById('anuncioDuracion');
-    durInput.type = 'number';
-    durInput.value = 30;
-    durInput.disabled = false;
-    durInput.readOnly = false;
-    durInput.style.color = '';
-    durInput.style.letterSpacing = '';
+    document.getElementById('anuncioRepeticiones').disabled = false;
+    document.querySelectorAll('.btn-num').forEach(b => b.disabled = false);
+
+    document.getElementById('anuncioDuracion').value = 30;
+    document.getElementById('anuncioDuracion').disabled = false;
     document.getElementById('anuncioIndefinido').checked = false;
     document.querySelectorAll('.btn-num-dur[data-input="anuncioDuracion"]').forEach(b => b.disabled = false);
   } catch (err) {
@@ -524,12 +530,13 @@ function renderAnuncios(lista) {
     const titulo = escapeHtml(a.titulo || 'Sin título');
     const tipo   = a.tipo === 'video' ? '🎬 Video' : '🔊 Audio';
     const tagCls = a.tipo === 'video' ? 'tag-video' : 'tag-audio';
-    const reps   = a.repeticionesPorDia || 0;
-    const vistas = Number(a.totalVistas) || 0;
 
+    // 🆕 Reps y duración
+    const reps = a.esIndefinido ? '∞' : (a.repeticionesPorDia || 0);
     const duracion = a.esIndefinido
       ? '∞ Indefinido'
       : `📅 Vence: ${fmtFecha(a.fechaVencimientoMs)}`;
+    const vistas = Number(a.totalVistas) || 0;
 
     return `
       <div class="ad-item" data-id="${escapeHtml(a.id)}">
@@ -700,18 +707,12 @@ function abrirRepublishModal(anuncio) {
   republicandoId = anuncio.id;
   republishTitle.textContent = anuncio.titulo || 'Sin título';
 
-  // Reset controls
-  const durInput = republishDuracion;
-  durInput.type = 'number';
-  durInput.value = anuncio.duracionDias || 30;
-  if (!durInput.value || parseInt(durInput.value, 10) < 1) {
-    durInput.value = 30;
-  }
-  durInput.disabled = false;
-  durInput.readOnly = false;
-  durInput.style.color = '';
-  durInput.style.letterSpacing = '';
   republishIndefinido.checked = false;
+  republishDuracion.disabled = false;
+  republishDuracion.value = anuncio.duracionDias || 30;
+  if (!republishDuracion.value || parseInt(republishDuracion.value, 10) < 1) {
+    republishDuracion.value = 30;
+  }
   document.querySelectorAll('.btn-num-dur[data-input="republishDuracion"]').forEach(b => b.disabled = false);
 
   republishModal.classList.remove('hidden');
@@ -748,13 +749,26 @@ republishConfirmBtn.addEventListener('click', async () => {
   republishConfirmBtn.innerHTML = '<span class="loader"></span>Publicando...';
 
   try {
-    await updateDoc(doc(db, COLECCION_ANUNCIOS, republicandoId), {
+    // 🆕 Si es indefinido, también se marcan repeticiones ilimitadas
+    const update = {
       esIndefinido,
+      repeticionesIlimitadas: esIndefinido,
       duracionDias,
       fechaPublicacionMs: ahoraMs,
       fechaVencimientoMs: fechaVencimientoMs,
       fechaRepublicacion: serverTimestamp()
-    });
+    };
+
+    // Si NO es indefinido, restaurar repeticiones si quedaron en 0
+    if (!esIndefinido) {
+      const anuncio = anunciosActuales.find(a => a.id === republicandoId);
+      const reps = anuncio?.repeticionesPorDia;
+      if (!reps || reps < 1) update.repeticionesPorDia = 3;
+    } else {
+      update.repeticionesPorDia = 0;
+    }
+
+    await updateDoc(doc(db, COLECCION_ANUNCIOS, republicandoId), update);
 
     toast('🔄 Anuncio publicado de nuevo', 'ok');
     cerrarRepublishModal();
@@ -808,7 +822,7 @@ function abrirPreviewDeAnuncio(anuncio) {
 }
 
 // ================================================================
-// 📊 MODAL DETALLE DIARIO
+// 📊 MODAL DETALLE DIARIO — lee de anuncios_vistas
 // ================================================================
 function abrirDetailModal(anuncio) {
   if (unsubscribeDetail) { unsubscribeDetail(); unsubscribeDetail = null; }
@@ -817,11 +831,12 @@ function abrirDetailModal(anuncio) {
   detailImg.onerror = () => { detailImg.onerror = null; detailImg.src = PLACEHOLDER; };
   detailTitle.textContent = anuncio.titulo || 'Sin título';
 
+  // 🆕 Info ampliada con reps y duración
   const tipo = anuncio.tipo === 'video' ? '🎬 Video' : '🔊 Audio';
   const dur  = anuncio.esIndefinido
-    ? '∞ Indefinido'
-    : `${anuncio.duracionDias || 0} días`;
-  detailSubtitle.textContent = `${tipo} · Duración: ${dur}`;
+    ? '∞ Indefinido · ♾️ Reps ilimitadas'
+    : `${anuncio.duracionDias || 0} días · ${anuncio.repeticionesPorDia || 0} reps/día`;
+  detailSubtitle.textContent = `${tipo} · ${dur}`;
 
   detailTbody.innerHTML = '';
   detailEmpty.classList.add('hidden');
