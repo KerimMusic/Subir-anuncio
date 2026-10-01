@@ -302,6 +302,7 @@ body {
 .field input::placeholder { color: var(--text-mute); }
 .field input:disabled { opacity: .4; cursor: not-allowed; }
 .field small { font-size: .74rem; color: var(--text-mute); line-height: 1.4; }
+.field small strong { color: #c4b5fd; }
 
 /* Input numérico con botones */
 .number-wrap { display: flex; align-items: stretch; gap: 8px; flex: 1; }
@@ -319,7 +320,11 @@ body {
 }
 .btn-num:hover, .btn-num-dur:hover { background: var(--accent); border-color: var(--accent); }
 .btn-num:active, .btn-num-dur:active { transform: scale(.95); }
-.btn-num-dur:disabled { opacity: .35; cursor: not-allowed; background: var(--bg-soft); }
+.btn-num:disabled, .btn-num-dur:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+  background: var(--bg-soft);
+}
 
 /* Fila de duración */
 .duration-row {
@@ -850,10 +855,4 @@ body {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-/* Input de duración en modo indefinido */
-.field input[type="text"]:disabled {
-  background: rgba(139, 92, 246, .08);
-  border-color: rgba(139, 92, 246, .3);
-  cursor: not-allowed;
 }
