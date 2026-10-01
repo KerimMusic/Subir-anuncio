@@ -61,35 +61,43 @@ const anunciosList      = document.getElementById('anunciosList');
 const anunciosCount     = document.getElementById('anunciosCount');
 const anunciosEmpty     = document.getElementById('anunciosEmpty');
 
-// 🆕 Finalizados
 const finalizadosSection = document.getElementById('finalizadosSection');
 const finalizadosList    = document.getElementById('finalizadosList');
 const finalizadosCount   = document.getElementById('finalizadosCount');
 const finalizadosEmpty   = document.getElementById('finalizadosEmpty');
 
-// Métricas
 const metricAnuncios   = document.getElementById('metricAnuncios');
 const metricVistas     = document.getElementById('metricVistas');
 const metricEngagement = document.getElementById('metricEngagement');
 
-// Modal preview
 const previewModal = document.getElementById('previewModal');
 const previewMedia = document.getElementById('previewMedia');
 const previewImg   = document.getElementById('previewImg');
 const previewTitle = document.getElementById('previewTitle');
 const previewTimer = document.getElementById('previewTimer');
 
-// Modal stats
 const statsModal = document.getElementById('statsModal');
 const statsList  = document.getElementById('statsList');
 const statsEmpty = document.getElementById('statsEmpty');
 
-// 🆕 Modal republicar
-const republishModal     = document.getElementById('republishModal');
-const republishTitle     = document.getElementById('republishTitle');
-const republishDuracion  = document.getElementById('republishDuracion');
-const republishIndefinido= document.getElementById('republishIndefinido');
-const republishConfirmBtn= document.getElementById('republishConfirmBtn');
+const republishModal      = document.getElementById('republishModal');
+const republishTitle      = document.getElementById('republishTitle');
+const republishDuracion   = document.getElementById('republishDuracion');
+const republishIndefinido = document.getElementById('republishIndefinido');
+const republishConfirmBtn = document.getElementById('republishConfirmBtn');
+
+// 🆕 Modal detalle diario
+const detailModal      = document.getElementById('detailModal');
+const detailImg        = document.getElementById('detailImg');
+const detailTitle      = document.getElementById('detailTitle');
+const detailSubtitle   = document.getElementById('detailSubtitle');
+const detailDias       = document.getElementById('detailDias');
+const detailVistas     = document.getElementById('detailVistas');
+const detailCompletas  = document.getElementById('detailCompletas');
+const detailSkips      = document.getElementById('detailSkips');
+const detailEngagement = document.getElementById('detailEngagement');
+const detailTbody      = document.getElementById('detailTbody');
+const detailEmpty      = document.getElementById('detailEmpty');
 
 const COLECCION_ANUNCIOS = 'anuncios';
 const COLECCION_VISITAS  = 'anuncios_vistas';
@@ -101,10 +109,11 @@ const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
 
 let usuarioActual       = null;
 let unsubscribeAnuncios = null;
-let anunciosActuales    = [];   // todos
-let anunciosActivos     = [];   // solo activos
-let anunciosFinalizados = [];   // solo finalizados
-let republicandoId      = null; // ID del anuncio que se está republicando
+let anunciosActuales    = [];
+let anunciosActivos     = [];
+let anunciosFinalizados = [];
+let republicandoId      = null;
+let unsubscribeDetail   = null;
 
 // =============== Utilidades ===============
 function toast(msg, tipo = 'ok') {
@@ -147,19 +156,21 @@ function fmtFecha(ms) {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// 🆕 Determina si un anuncio está vencido
+function fmtFechaCorta(fechaStr) {
+  if (!fechaStr) return '—';
+  const [y, m, d] = String(fechaStr).split('-').map(Number);
+  if (!y || !m || !d) return fechaStr;
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('es-MX', {
+    day: '2-digit', month: 'short', year: 'numeric'
+  });
+}
+
 function estaVencido(ad) {
   if (!ad) return false;
   if (ad.esIndefinido) return false;
   if (!ad.fechaVencimientoMs) return false;
   return Date.now() >= ad.fechaVencimientoMs;
-}
-
-// 🆕 Texto de duración
-function textoDuracion(ad) {
-  if (ad.esIndefinido) return '∞ Indefinido';
-  if (ad.duracionDias) return `${ad.duracionDias} día${ad.duracionDias === 1 ? '' : 's'}`;
-  return '—';
 }
 
 // =============== Login ===============
@@ -207,6 +218,8 @@ onAuthStateChanged(auth, (user) => {
     loginBtn.disabled = false;
 
     if (unsubscribeAnuncios) { unsubscribeAnuncios(); unsubscribeAnuncios = null; }
+    if (unsubscribeDetail)   { unsubscribeDetail();   unsubscribeDetail = null; }
+
     anunciosList.innerHTML = '';
     finalizadosList.innerHTML = '';
     anunciosCount.textContent = '0';
@@ -233,7 +246,7 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 // ================================================================
-// 🆕 CONTROLES DE DURACIÓN (form principal + modal republicar)
+// CONTROLES DE DURACIÓN
 // ================================================================
 function setupDurationControls(inputId, checkboxId) {
   const input    = document.getElementById(inputId);
@@ -270,7 +283,7 @@ function setupDurationControls(inputId, checkboxId) {
 setupDurationControls('anuncioDuracion',   'anuncioIndefinido');
 setupDurationControls('republishDuracion', 'republishIndefinido');
 
-// =============== Botones +/- de repeticiones (sin cambios) ===============
+// =============== Botones +/- de repeticiones ===============
 document.querySelectorAll('.btn-num').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById('anuncioRepeticiones');
@@ -294,7 +307,6 @@ formAnuncio.addEventListener('submit', async (e) => {
   const videoRaw     = document.getElementById('anuncioVideo').value.trim();
   const repeticiones = parseInt(document.getElementById('anuncioRepeticiones').value, 10) || 0;
 
-  // 🆕 Duración
   const esIndefinido = document.getElementById('anuncioIndefinido').checked;
   const duracionDias = esIndefinido
     ? 0
@@ -316,7 +328,6 @@ formAnuncio.addEventListener('submit', async (e) => {
   const videoUrl  = videoRaw  ? dropboxDirecto(videoRaw)  : '';
   const tipo      = videoUrl ? 'video' : 'audio';
 
-  // 🆕 Fechas en milisegundos para filtrar fácilmente
   const ahoraMs = Date.now();
   const fechaVencimientoMs = esIndefinido
     ? null
@@ -330,13 +341,10 @@ formAnuncio.addEventListener('submit', async (e) => {
     await addDoc(collection(db, COLECCION_ANUNCIOS), {
       titulo, audioUrl, imagenUrl, videoUrl, tipo,
       repeticionesPorDia: repeticiones,
-
-      // 🆕 Duración
       esIndefinido,
       duracionDias,
-      fechaPublicacionMs:  ahoraMs,
-      fechaVencimientoMs:  fechaVencimientoMs,
-
+      fechaPublicacionMs: ahoraMs,
+      fechaVencimientoMs: fechaVencimientoMs,
       totalVistas: 0,
       totalCompletadas: 0,
       totalSkips: 0,
@@ -348,8 +356,6 @@ formAnuncio.addEventListener('submit', async (e) => {
     toast('✅ Anuncio guardado', 'ok');
     formAnuncio.reset();
     document.getElementById('anuncioRepeticiones').value = 3;
-
-    // 🆕 Reset controles de duración
     document.getElementById('anuncioDuracion').value = 30;
     document.getElementById('anuncioDuracion').disabled = false;
     document.getElementById('anuncioIndefinido').checked = false;
@@ -451,7 +457,6 @@ function escucharAnuncios(uid) {
       .filter(a => a.uid === uid)
       .sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
 
-    // 🆕 Separar activos / finalizados
     const activos     = mios.filter(a => !estaVencido(a));
     const finalizados = mios.filter(a =>  estaVencido(a));
 
@@ -488,7 +493,6 @@ function renderAnuncios(lista) {
     const reps   = a.repeticionesPorDia || 0;
     const vistas = Number(a.totalVistas) || 0;
 
-    // 🆕 Info de duración
     const duracion = a.esIndefinido
       ? '∞ Indefinido'
       : `📅 Vence: ${fmtFecha(a.fechaVencimientoMs)}`;
@@ -507,6 +511,7 @@ function renderAnuncios(lista) {
           </small>
         </div>
         <div class="ad-item-actions">
+          <button type="button" class="btn-icon" data-action="detail" data-id="${escapeHtml(a.id)}" title="Ver detalle diario">📊</button>
           <button type="button" class="btn-icon" data-action="preview" data-id="${escapeHtml(a.id)}" title="Vista previa">▶</button>
           <button type="button" class="btn-icon danger" data-action="delete" data-id="${escapeHtml(a.id)}" title="Eliminar">🗑️</button>
         </div>
@@ -515,7 +520,7 @@ function renderAnuncios(lista) {
   }).join('');
 }
 
-// =============== 🆕 Render finalizados ===============
+// =============== Render finalizados ===============
 function renderFinalizados(lista) {
   finalizadosCount.textContent = lista.length;
 
@@ -547,6 +552,7 @@ function renderFinalizados(lista) {
           </small>
         </div>
         <div class="ad-item-actions">
+          <button type="button" class="btn-icon" data-action="detail" data-id="${escapeHtml(a.id)}" title="Ver detalle diario">📊</button>
           <button type="button" class="btn-icon success" data-action="republish" data-id="${escapeHtml(a.id)}" title="Volver a publicar">🔄</button>
           <button type="button" class="btn-icon danger" data-action="delete-full" data-id="${escapeHtml(a.id)}" title="Eliminar completamente">🗑️</button>
         </div>
@@ -563,6 +569,11 @@ anunciosList.addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   const anuncio = anunciosActuales.find(a => a.id === id);
   if (!anuncio) return;
+
+  if (btn.dataset.action === 'detail') {
+    abrirDetailModal(anuncio);
+    return;
+  }
 
   if (btn.dataset.action === 'preview') {
     abrirPreviewDeAnuncio(anuncio);
@@ -585,7 +596,7 @@ anunciosList.addEventListener('click', async (e) => {
   }
 });
 
-// =============== 🆕 Click en finalizados ===============
+// =============== Click en finalizados ===============
 finalizadosList.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -593,6 +604,11 @@ finalizadosList.addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   const anuncio = anunciosActuales.find(a => a.id === id);
   if (!anuncio) return;
+
+  if (btn.dataset.action === 'detail') {
+    abrirDetailModal(anuncio);
+    return;
+  }
 
   if (btn.dataset.action === 'republish') {
     abrirRepublishModal(anuncio);
@@ -616,21 +632,19 @@ finalizadosList.addEventListener('click', async (e) => {
 });
 
 // ================================================================
-// 🆕 ELIMINACIÓN COMPLETA
-// Borra: doc del anuncio + todos los registros de visitas asociados
+// ELIMINACIÓN COMPLETA
 // ================================================================
 async function eliminarAnuncioCompleto(anuncioId) {
   if (!anuncioId) throw new Error('ID inválido');
 
-  // 1️⃣ Borrar todos los registros de visitas asociados
   try {
     const visitasSnap = await getDocs(collection(db, COLECCION_VISITAS));
     const promesas = [];
 
     visitasSnap.forEach(d => {
       const data = d.data() || {};
-      const idCoincide     = d.id.startsWith(anuncioId + '_');
-      const campoCoincide  = data.anuncioId === anuncioId;
+      const idCoincide    = d.id.startsWith(anuncioId + '_');
+      const campoCoincide = data.anuncioId === anuncioId;
 
       if (idCoincide || campoCoincide) {
         promesas.push(deleteDoc(d.ref));
@@ -640,21 +654,18 @@ async function eliminarAnuncioCompleto(anuncioId) {
     await Promise.all(promesas);
   } catch (e) {
     console.warn('Error al borrar visitas:', e);
-    // Continuamos con el borrado del anuncio principal aunque falle
   }
 
-  // 2️⃣ Borrar el documento principal del anuncio
   await deleteDoc(doc(db, COLECCION_ANUNCIOS, anuncioId));
 }
 
 // ================================================================
-// 🆕 REPUBLICAR
+// REPUBLICAR
 // ================================================================
 function abrirRepublishModal(anuncio) {
   republicandoId = anuncio.id;
   republishTitle.textContent = anuncio.titulo || 'Sin título';
 
-  // Resetear controles
   republishIndefinido.checked = false;
   republishDuracion.disabled = false;
   republishDuracion.value = anuncio.duracionDias || 30;
@@ -700,9 +711,9 @@ republishConfirmBtn.addEventListener('click', async () => {
     await updateDoc(doc(db, COLECCION_ANUNCIOS, republicandoId), {
       esIndefinido,
       duracionDias,
-      fechaPublicacionMs:  ahoraMs,
-      fechaVencimientoMs:  fechaVencimientoMs,
-      fechaRepublicacion:  serverTimestamp()
+      fechaPublicacionMs: ahoraMs,
+      fechaVencimientoMs: fechaVencimientoMs,
+      fechaRepublicacion: serverTimestamp()
     });
 
     toast('🔄 Anuncio publicado de nuevo', 'ok');
@@ -756,6 +767,113 @@ function abrirPreviewDeAnuncio(anuncio) {
   previewModal.classList.remove('hidden');
 }
 
+// ================================================================
+// 📊 MODAL DETALLE DIARIO — lee de anuncios_vistas
+// ================================================================
+function abrirDetailModal(anuncio) {
+  if (unsubscribeDetail) { unsubscribeDetail(); unsubscribeDetail = null; }
+
+  detailImg.src = anuncio.imagenUrl || PLACEHOLDER;
+  detailImg.onerror = () => { detailImg.onerror = null; detailImg.src = PLACEHOLDER; };
+  detailTitle.textContent = anuncio.titulo || 'Sin título';
+
+  const tipo = anuncio.tipo === 'video' ? '🎬 Video' : '🔊 Audio';
+  const dur  = anuncio.esIndefinido
+    ? '∞ Indefinido'
+    : `${anuncio.duracionDias || 0} días`;
+  detailSubtitle.textContent = `${tipo} · Duración: ${dur}`;
+
+  detailTbody.innerHTML = '';
+  detailEmpty.classList.add('hidden');
+  detailVistas.textContent     = '0';
+  detailCompletas.textContent  = '0';
+  detailSkips.textContent      = '0';
+  detailDias.textContent       = '0';
+  detailEngagement.textContent = '0%';
+
+  const loading = document.createElement('tr');
+  loading.innerHTML = `<td colspan="5" class="detail-loading">⏳ Cargando registros...</td>`;
+  detailTbody.appendChild(loading);
+
+  detailModal.classList.remove('hidden');
+
+  const ref = collection(db, COLECCION_VISITAS);
+
+  unsubscribeDetail = onSnapshot(ref, (snap) => {
+    const registros = [];
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const pertenecePorCampo = data.anuncioId === anuncio.id;
+      const pertenecePorId    = d.id.startsWith(anuncio.id + '_');
+
+      if (pertenecePorCampo || pertenecePorId) {
+        registros.push({
+          docId:       d.id,
+          fecha:       data.fecha || '',
+          contador:    Number(data.contador)    || 0,
+          completadas: Number(data.completadas) || 0,
+          skips:       Number(data.skips)       || 0
+        });
+      }
+    });
+
+    registros.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+
+    let totalVistas = 0, totalCompletas = 0, totalSkips = 0;
+    registros.forEach(r => {
+      totalVistas    += r.contador;
+      totalCompletas += r.completadas;
+      totalSkips     += r.skips;
+    });
+    const engagement = totalVistas > 0
+      ? ((totalCompletas / totalVistas) * 100).toFixed(1) + '%'
+      : '0%';
+
+    detailDias.textContent       = registros.length;
+    detailVistas.textContent     = fmtNumero(totalVistas);
+    detailCompletas.textContent  = fmtNumero(totalCompletas);
+    detailSkips.textContent      = fmtNumero(totalSkips);
+    detailEngagement.textContent = engagement;
+
+    detailTbody.innerHTML = '';
+
+    if (!registros.length) {
+      detailEmpty.classList.remove('hidden');
+      return;
+    }
+    detailEmpty.classList.add('hidden');
+
+    detailTbody.innerHTML = registros.map(r => {
+      const eng = r.contador > 0
+        ? ((r.completadas / r.contador) * 100).toFixed(1) + '%'
+        : '0%';
+
+      return `
+        <tr>
+          <td class="col-fecha">${escapeHtml(fmtFechaCorta(r.fecha))}</td>
+          <td class="col-num">${fmtNumero(r.contador)}</td>
+          <td class="col-num">${fmtNumero(r.completadas)}</td>
+          <td class="col-num">${fmtNumero(r.skips)}</td>
+          <td class="col-eng">${eng}</td>
+        </tr>
+      `;
+    }).join('');
+  }, (err) => {
+    console.error('Error detalle:', err);
+    detailTbody.innerHTML = `<tr><td colspan="5" class="detail-loading">⚠️ Error al cargar: ${escapeHtml(err.message)}</td></tr>`;
+  });
+}
+
+function cerrarDetailModal() {
+  if (unsubscribeDetail) { unsubscribeDetail(); unsubscribeDetail = null; }
+  detailModal.classList.add('hidden');
+  detailTbody.innerHTML = '';
+}
+
+detailModal.addEventListener('click', (e) => {
+  if (e.target.dataset.close === 'detail') cerrarDetailModal();
+});
+
 // =============== Métricas superiores ===============
 function actualizarMetricas(activos, todos) {
   const totalActivos = (activos || []).length;
@@ -780,5 +898,6 @@ document.addEventListener('keydown', (e) => {
     if (!previewModal.classList.contains('hidden'))   cerrarPreview();
     if (!statsModal.classList.contains('hidden'))     statsModal.classList.add('hidden');
     if (!republishModal.classList.contains('hidden')) cerrarRepublishModal();
+    if (!detailModal.classList.contains('hidden'))    cerrarDetailModal();
   }
 });
