@@ -127,7 +127,7 @@
             </div>
           </div>
 
-          <!-- 🆕 DURACIÓN DEL ANUNCIO -->
+          <!-- DURACIÓN DEL ANUNCIO -->
           <div class="field">
             <label for="anuncioDuracion">Duración del anuncio (días)</label>
             <div class="duration-row">
@@ -174,7 +174,7 @@
 
     </div>
 
-    <!-- 🆕 SECCIÓN: ANUNCIOS FINALIZADOS -->
+    <!-- SECCIÓN: ANUNCIOS FINALIZADOS -->
     <section class="panel panel-finished" id="finalizadosSection">
       <header class="panel-header">
         <h2>🗂️ Anuncios finalizados</h2>
@@ -234,7 +234,7 @@
     </div>
   </div>
 
-  <!-- ============ MODAL REPUBLICAR (NUEVO) ============ -->
+  <!-- ============ MODAL REPUBLICAR ============ -->
   <div id="republishModal" class="modal hidden">
     <div class="modal-backdrop" data-close="republish"></div>
 
@@ -272,6 +272,69 @@
         <button type="button" class="btn-secondary" data-close="republish">Cancelar</button>
         <button type="button" id="republishConfirmBtn" class="btn-primary">Publicar de nuevo</button>
       </footer>
+    </div>
+  </div>
+
+  <!-- ============ MODAL DETALLE DIARIO ============ -->
+  <div id="detailModal" class="modal hidden">
+    <div class="modal-backdrop" data-close="detail"></div>
+
+    <div class="modal-card modal-card-wide">
+      <header class="modal-header">
+        <span class="modal-tag">📊 Detalle diario</span>
+        <button type="button" class="modal-close" data-close="detail">✕</button>
+      </header>
+
+      <div class="detail-summary">
+        <img id="detailImg" src="" alt="">
+        <div class="detail-summary-info">
+          <strong id="detailTitle">—</strong>
+          <small id="detailSubtitle">—</small>
+        </div>
+      </div>
+
+      <div class="detail-totals">
+        <div class="detail-total-cell">
+          <span class="detail-total-label">📅 Días activo</span>
+          <strong id="detailDias" class="detail-total-value">0</strong>
+        </div>
+        <div class="detail-total-cell">
+          <span class="detail-total-label">👁️ Vistas</span>
+          <strong id="detailVistas" class="detail-total-value">0</strong>
+        </div>
+        <div class="detail-total-cell">
+          <span class="detail-total-label">✅ Completas</span>
+          <strong id="detailCompletas" class="detail-total-value">0</strong>
+        </div>
+        <div class="detail-total-cell">
+          <span class="detail-total-label">⏭️ Skips</span>
+          <strong id="detailSkips" class="detail-total-value">0</strong>
+        </div>
+        <div class="detail-total-cell earn">
+          <span class="detail-total-label">📈 Engagement</span>
+          <strong id="detailEngagement" class="detail-total-value">0%</strong>
+        </div>
+      </div>
+
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>📅 Fecha</th>
+              <th>👁️ Vistas</th>
+              <th>✅ Completas</th>
+              <th>⏭️ Skips</th>
+              <th>📈 Eng.</th>
+            </tr>
+          </thead>
+          <tbody id="detailTbody"></tbody>
+        </table>
+
+        <div id="detailEmpty" class="empty-state hidden">
+          <span class="empty-icon">📭</span>
+          <p>Todavía no hay registros de reproducción</p>
+        </div>
+      </div>
     </div>
   </div>
 
